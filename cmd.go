@@ -34,12 +34,19 @@ func CmdOutNoLn(name string, arg ...string) (out string, err error) {
 }
 
 func CmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
+	var err error
+
+	//set group id
+	err = syscall.Setpgid(cmd.Process.Pid, cmd.Process.Pid)
+	if err != nil {
+		log.Println("Setpgid failed, error:", err)
+	}
+
 	done := make(chan error)
 	go func() {
 		done <- cmd.Wait()
 	}()
 
-	var err error
 	select {
 	case <-time.After(timeout):
 		log.Printf("timeout, process:%s will be killed", cmd.Path)
@@ -48,11 +55,15 @@ func CmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 			<-done // allow goroutine to exit
 		}()
 
-		// timeout
-		if err = cmd.Process.Kill(); err != nil {
-			log.Printf("failed to kill: %s, error: %s", cmd.Path, err)
+		err = syscall.Kill(cmd.Process.Pid-(cmd.Process.Pid*2), 9)
+		if err != nil {
+			log.Println("kill plugin failed, error:", err)
 		}
-
+		/*
+			if err = cmd.Process.Kill(); err != nil {
+				log.Printf("failed to kill: %s, error: %s", cmd.Path, err)
+			}
+		*/
 		return err, true
 	case err = <-done:
 		return err, false
