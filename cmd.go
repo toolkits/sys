@@ -55,15 +55,12 @@ func CmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 			<-done // allow goroutine to exit
 		}()
 
-		err = syscall.Kill(cmd.Process.Pid-(cmd.Process.Pid*2), 9)
+		// cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} is necessary before cmd.Start()
+		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		if err != nil {
-			log.Println("kill plugin failed, error:", err)
+			log.Println("kill failed, error:", err)
 		}
-		/*
-			if err = cmd.Process.Kill(); err != nil {
-				log.Printf("failed to kill: %s, error: %s", cmd.Path, err)
-			}
-		*/
+
 		return err, true
 	case err = <-done:
 		return err, false
